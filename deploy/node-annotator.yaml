@@ -1,0 +1,139 @@
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: caihcloud-node-annotator-clusterrole
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - patch
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - patch
+  - apiGroups:
+      - "coordination.k8s.io"
+    resources:
+      - leases
+    verbs:
+      - "*"
+  
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: caihcloud-node-annotator-sa
+  namespace: monitor
+
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: caihcloud-node-annotator-clusterrolebinding
+  namespace: monitor
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: caihcloud-node-annotator-clusterrole
+subjects:
+  - kind: ServiceAccount
+    name: caihcloud-node-annotator-sa
+    namespace: monitor
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: annotator-config
+  namespace: monitor
+data:
+  annotator-config.yaml: |-
+    metrics:
+    - name: scheduler_cpu_usage_avg_5m_percent
+      expr: scheduler_cpu_usage_avg_5m_percent
+      weight: 0.15
+      threshold: 0.75
+    - name: scheduler_cpu_usage_max_avg_1h_percent
+      expr: scheduler_cpu_usage_max_avg_1h_percent
+      weight: 0.05
+      threshold: 0.85
+    - name: scheduler_cpu_usage_max_avg_1d_percent
+      expr: scheduler_cpu_usage_max_avg_1d_percent
+      weight: 0.05
+    - name: scheduler_mem_usage_avg_5m_percent
+      expr: scheduler_mem_usage_avg_5m_percent
+      weight: 0.4
+      threshold: 0.75
+    - name: scheduler_mem_usage_max_avg_1h_percent
+      expr: scheduler_mem_usage_max_avg_1h_percent
+      weight: 0.2
+    - name: scheduler_mem_usage_max_avg_1d_percent
+      expr: scheduler_mem_usage_max_avg_1d_percent
+      weight: 0.15
+
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: caihcloud-node-annotator
+  namespace: monitor
+  labels:
+    component: caihcloud-node-annotator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: caihcloud-node-annotator
+  template:
+    metadata:
+      labels:
+        component: caihcloud-node-annotator
+    spec:
+      serviceAccount: caihcloud-node-annotator-sa
+      priorityClassName: system-cluster-critical
+      containers:
+        - name: node-annotator-ctrl
+          image: caihcloud-node-annotator:latest
+          imagePullPolicy: IfNotPresent
+          workingDir: /
+          args:
+            - node-annotator
+            - --prometheus-url=http://prometheus-service.monitor.svc:9090
+            - --pushgateway-url=http://pushgateway.monitor.svc:9091
+            - --scheduler-name=caihcloud-scheduler
+            - --lease-lock-namespace=monitor
+            - --annotator-config=/config/annotator-config.yaml
+          resources:
+            limits:
+              cpu: 1
+              memory: 1Gi
+            requests:
+              cpu: 10m
+              memory: 10Mi
+          volumeMounts:
+            - mountPath: /etc/localtime
+              name: etc-localtime
+            - name: config
+              mountPath: /config/annotator-config.yaml
+              subPath: annotator-config.yaml
+      volumes:
+        - name: etc-localtime
+          hostPath:
+            path: /etc/localtime
+        - name: config
+          configMap:
+            name: annotator-config

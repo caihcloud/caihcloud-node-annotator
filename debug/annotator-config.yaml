@@ -1,0 +1,22 @@
+    metrics:
+    - name: scheduler_cpu_usage_avg_5m_percent
+      expr: scheduler_cpu_usage_avg_5m_percent
+      weight: 0.15
+      threshold: 0.85
+    - name: scheduler_cpu_usage_max_avg_1h_percent
+      expr: scheduler_cpu_usage_max_avg_1h_percent
+      weight: 0.05
+      threshold: 0.90
+    - name: scheduler_cpu_usage_max_avg_1d_percent
+      expr: scheduler_cpu_usage_max_avg_1d_percent
+      weight: 0.05
+    - name: scheduler_mem_usage_avg_5m_percent
+      expr: scheduler_mem_usage_avg_5m_percent
+      weight: 0.4
+      threshold: 0.85
+    - name: scheduler_mem_usage_max_avg_1h_percent
+      expr: scheduler_mem_usage_max_avg_1h_percent
+      weight: 0.2
+    - name: scheduler_mem_usage_max_avg_1d_percent
+      expr: scheduler_mem_usage_max_avg_1d_percent
+      weight: 0.15
